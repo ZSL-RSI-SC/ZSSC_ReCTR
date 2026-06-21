@@ -7,7 +7,7 @@ import numpy as np
 
 np.random.seed(2060)
 # Get the list of all files and directories
-path = "/home/rambabu/super_resolution" # path to the dataset
+path = "/home/abcd/" # path to the dataset
 dir_list = os.listdir(path)
 ac_list = dir_list.copy()
 
