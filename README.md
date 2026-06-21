@@ -1,7 +1,7 @@
 **ReCTR**
 
 
-This GitHub repository contains the training code for the paper  "** ReCTR: Cross Transformer augmented Feature Refinement for Zero-Shot Remote Sensing Scene Classification **". 
+This GitHub repository contains the training code for the paper  "** ReCTR: Learning Refined Cross Transformer Representations for Zero-Shot Remote Sensing Scene Classification **". 
 
 **The Framework for the ReCTR **
 
@@ -21,10 +21,7 @@ $ pip install wandb
 
 **Downloading datasets**
 
-We trained the model "ReCTR" on three prominent benchmark datasets of the zero-shot scene classification in remote sensing images: [UCM21](http://weegee.vision.ucmerced.edu/datasets/landuse.html), [AID30](https://captain-whu.github.io/AID/), NWPU45. Please download the NWPU dataset in your own way. To train the "ReCTR", first, you should download these datasets. Then, use the following link to obtain super-resolution images. 
-
-https://github.com/zsyOAOA/ResShift
-
+We trained the model "ReCTR" on three prominent benchmark datasets of the zero-shot scene classification in remote sensing images: [UCM21](http://weegee.vision.ucmerced.edu/datasets/landuse.html), [AID30](https://captain-whu.github.io/AID/), NWPU45.
 Further, organize them as follows: 
 ```
 .
@@ -33,15 +30,6 @@ Further, organize them as follows:
 │   ├── AID/...
 │   ├── NWPU/...
 │
-└── ···
-```
-Specifically, the super-resolution images of the UCM dataset are organized as follows: 
-```
-├── data
-│   ├── UCM/runway/runway89.png
-|   |__ UCM/river/river35.png
-|   |__ UCM/sparseresidential/sparseresidential25.png
-│   |__ ...
 └── ···
 ```
 **Generaring res101.mat and att_splits.mat files**
