@@ -185,6 +185,10 @@ class CAT(nn.Module):
 
         self.W_3_v2s = nn.Parameter(nn.init.zeros_(torch.empty(self.dim_f, config.tf_common_dim)).to(device), requires_grad=True)
         self.W_4_v2s = nn.Parameter(nn.init.normal_(torch.empty(config.tf_common_dim, config.tf_common_dim)).to(device), requires_grad=True)
+        self.s2v_proj = nn.Linear(300, 2048).to(device)
+        self.v2s_proj = nn.Linear(300, 2048).to(device)
+        self.gate_fc = nn.Sequential(nn.Linear(4096, 2048), nn.ReLU(inplace=True), nn.Linear(2048, 1)).to(device)
+        
         # transformer semantic -> visual
         self.transformer_s2v = TransformerPP(
             device = config.device,
@@ -245,14 +249,7 @@ class CAT(nn.Module):
         V_n_batch = V_n.unsqueeze(0).repeat(shape[0], 1, 1)
         # semantic-2-visual
         memory_s2v, _, emb_att_s2v = self.transformer_s2v.forward_encoder(Fs_pmt, V_n_batch)
-        F_p_s2v = self.transformer_s2v.forward_decoder(
-            memory_s2v, emb_att_s2v, type='s2v')
-        #added code goes here
-        #print("s2v output", F_p_s2v.shape)
-        A = F.softmax(F_p_s2v, dim=-1)
-        #print("A shape",A.shape)
-        HS = torch.einsum('biv, bfr->bif', A, Fs)
-        #print("Hs shape",HS.shape)
+        F_p_s2v = self.transformer_s2v.forward_decoder(memory_s2v, emb_att_s2v, type='s2v')
         
         S_p_s2v = torch.einsum('biv,vc,bic->bi', V_n_batch, self.W_1_s2v, F_p_s2v)
         embed_s2v = S_p_s2v
@@ -260,29 +257,24 @@ class CAT(nn.Module):
         memory_v2s, emb_vis_v2s, emb_att_v2s = self.transformer_v2s.forward_encoder(
             Fs_pmt, V_n_batch)
         F_p_v2s = self.transformer_v2s.forward_decoder(memory_v2s, emb_att_v2s, type='v2s')
-        #print("F_p_v2s shape",F_p_v2s.shape)
-        #A2 = F.softmax(F_p_v2s, dim=-1)
-        #print("A2 shape",A2.shape)
-        #HS2 = torch.einsum('biv, bfr->bvf', A2, Fs)
-        #print("Hs2 shape",HS2.shape)
-        #rt = torch.cat((HS, HS2), dim=0)
-        #Hs=rt
-        #print("resultanat shape",rt.shape)
         S_p_v2s = torch.einsum('rbf,fc,brc->br', memory_v2s, self.W_1_v2s, F_p_v2s)
         #print("S_p_v2s shape",S_p_v2s.shape)
         E_v2s = torch.einsum('brc,cc,bic->bir', emb_vis_v2s, self.W_4_v2s, emb_att_v2s)
-        #print("E_v2s shape",E_v2s.shape)
-        A2 = F.softmax(F_p_v2s, dim=-1)
-        #print("A2 shape",A2.shape)
-        HS2 = torch.einsum('biv, bfr->bif', A2, Fs)
-        #print("Hs2 shape",HS2.shape)
-        rt = torch.cat((HS, HS2), dim=1)
-        #print("resultanat shape",rt.shape)
-        Hs=rt
         embed_v2s = torch.einsum('bir,br->bi', E_v2s, S_p_v2s)
-        #print("embedding shapes",embed_s2v.shape, embed_v2s.shape)
-        #return embed_s2v, embed_v2s, Hs
-        return {'embed_s2v':embed_s2v, 'embed_v2s':embed_v2s, 'Hs':Hs}
+
+        Hs = self.s2v_proj(F_p_s2v)
+        alpha = torch.softmax(embed_s2v, dim=1)
+        tilde_m = torch.sum(alpha.unsqueeze(-1) * Hs, dim=1) # attribute aware visual features
+
+        Hv = self.v2s_proj(F_p_v2s)
+        beta = torch.softmax(S_p_v2s, dim=1)
+        bar_m = torch.sum(beta.unsqueeze(-1) * Hv, dim=1)
+        
+        fusion_input = torch.cat([tilde_m, bar_m], dim=-1)
+        gate = self.gate_fc(fusion_input)
+        m_prime = gate * tilde_m + (1.0 - gate) * bar_m
+        
+        return {'embed_s2v':embed_s2v, 'embed_v2s':embed_v2s, 'Hs':m_prime}
 
     def forward_attribute(self, embed):
         embed = torch.einsum('ki,bi->bk', self.att, embed)
